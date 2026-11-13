@@ -147,3 +147,16 @@
   background: var(--ui-surface-raised);
   border-radius: var(--ui-radius-sm);
 }
+
+/* Hierarchy styles: top-level folder names read as section titles. */
+.group-label[data-depth="1"] {
+  color: var(--ui-text);
+  font-size: var(--ui-text-base);
+  font-weight: var(--ui-weight-semibold);
+}
+
+.group-label[data-style="bars"][data-depth="1"],
+.group-label[data-style="bars"][data-depth="2"],
+.group-label[data-style="bars"][data-depth="3"] {
+  color: var(--ui-text);
+}

@@ -9,8 +9,9 @@ import { applySnapshot } from "../canvas/scene.js";
 
 interface UndoEntry {
   label: string;
-  undo(): Promise<void> | void;
-  redo(): Promise<void> | void;
+  /** Return false when the person cancelled, so the step stays where it was. */
+  undo(): Promise<void | boolean> | void | boolean;
+  redo(): Promise<void | boolean> | void | boolean;
 }
 
 const SEEN_KEY = (root: string) => `locus:seen:${root}`;
@@ -26,6 +27,8 @@ export class Session {
   private redoStack: UndoEntry[] = [];
   onBoard: (board: Board, keepCamera: boolean) => void = () => {};
   onNotice: (text: string, undo?: () => void) => void = () => {};
+  /** Ask the person before anything changes on disk. Resolves to null on cancel. */
+  ask: (q: { title: string; body?: string; confirm: string; input?: string }) => Promise<string | null> = async () => "yes";
 
   constructor(private backend: Backend, readonly root: string, payload: BoardPayload) {
     this.own = payload.own;
@@ -118,23 +121,35 @@ export class Session {
   async undo() {
     const e = this.undoStack.pop();
     if (!e) return;
-    await e.undo();
-    this.redoStack.push(e);
+    if ((await e.undo()) === false) this.undoStack.push(e);
+    else this.redoStack.push(e);
   }
 
   async redo() {
     const e = this.redoStack.pop();
     if (!e) return;
-    await e.redo();
-    this.undoStack.push(e);
+    if ((await e.redo()) === false) this.redoStack.push(e);
+    else this.undoStack.push(e);
   }
 
   // ---------- files on disk ----------
 
   /** Move (or copy, with Alt) images into another folder's box. Their size,
    *  rotation and flip carry over; they land where they were dropped. */
-  async moveFiles(items: ItemNode[], to: GroupNode, copy: boolean, dropAt: { x: number; y: number }) {
-    if (items.length > 20 && !window.confirm(`${copy ? "Copy" : "Move"} ${items.length} images into “${to.name}”?`)) return;
+  /** Returns false if nothing moved (cancelled or failed). A redo passes
+   *  `record: false` because its undo entry already exists. */
+  async moveFiles(items: ItemNode[], to: GroupNode, copy: boolean, dropAt: { x: number; y: number }, record = true): Promise<boolean> {
+    if (!items.length) return false;
+    const what = items.length === 1 ? `“${items[0].img.name}”` : `${items.length.toLocaleString()} images`;
+    const where = to.name || "the board folder";
+    const sure = await this.ask({
+      title: `${copy ? "Copy" : "Move"} ${what} to “${where}”?`,
+      body: copy
+        ? `This makes ${items.length === 1 ? "a copy of the file" : "copies of the files"} in ${to.path || "the board folder"} on disk.`
+        : `This moves ${items.length === 1 ? "the file" : "the files"} on disk, into ${to.path || "the board folder"}. Everyone who shares this folder will see the change. You can undo it.`,
+      confirm: copy ? "Copy" : "Move"
+    });
+    if (!sure) return false;
     const done: { from: string; to: string; fromFolder: string; rec: ItemRec }[] = [];
     const origin = contentOrigin(to);
     const anchor = items[0];
@@ -151,7 +166,7 @@ export class Session {
         this.onNotice(`Couldn't ${copy ? "copy" : "move"} ${it.img.name}. ${String(e)}`);
       }
     }
-    if (!done.length) return;
+    if (!done.length) return false;
     // Placing images by hand makes the target a Free box.
     if (to.mode === "auto") {
       to.mode = "free";
@@ -166,6 +181,14 @@ export class Session {
     await this.reload(true);
     const verb = copy ? "Copied" : "Moved";
     const undo = async () => {
+      if (!copy) {
+        const back = await this.ask({
+          title: `Move ${done.length === 1 ? `“${items[0].img.name}”` : `${done.length.toLocaleString()} images`} back?`,
+          body: `This moves ${done.length === 1 ? "the file" : "the files"} on disk back to where ${done.length === 1 ? "it was" : "they were"}.`,
+          confirm: "Move back"
+        });
+        if (!back) return false;
+      }
       for (const d of done) {
         if (copy) continue; // copies are left on disk; undo only forgets the layout
         try {
@@ -179,11 +202,11 @@ export class Session {
       await this.flush();
       await this.reload(true);
     };
-    const redo = async () => {
-      await this.moveFiles(done.map((d) => this.board.items.get(d.from)).filter((x): x is ItemNode => !!x), to, copy, dropAt);
-    };
-    this.push({ label: verb, undo, redo });
+    const redo = () =>
+      this.moveFiles(done.map((d) => this.board.items.get(d.from)).filter((x): x is ItemNode => !!x), to, copy, dropAt, false);
+    if (record) this.push({ label: verb, undo, redo });
     this.onNotice(`${verb} ${done.length === 1 ? items[0].img.name : `${done.length} images`} to ${to.name || "the board folder"}.`, () => void this.undo());
+    return true;
   }
 
   async createFolder(parent: GroupNode, name: string) {
@@ -206,7 +229,7 @@ export class Session {
     this.own = { ...payload.own, items: { ...payload.own.items, ...this.own.items }, groups: { ...payload.own.groups, ...this.own.groups } };
     const seen = new Set(this.board.items.keys());
     const prev = this.board;
-    this.board = buildBoard(payload.scan, payload.layout, seen);
+    this.board = buildBoard(payload.scan, payload.layout, seen, prev);
     // New-file dots that were showing stay until the board is reopened.
     for (const it of this.board.items.values()) if (prev.items.get(it.path)?.isNew) it.isNew = true;
     layoutBoard(this.board);

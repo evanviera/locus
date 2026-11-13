@@ -73,16 +73,31 @@ test("dragging an image inside its box makes the box Free and saves the spot", a
   expect(state).toEqual({ mode: "free", saved: true, groupSaved: "free" });
 });
 
-test("dropping an image on another folder moves the file, and Undo moves it back", async ({ page }) => {
+test("dropping an image on another folder asks first, moves the file, and Undo moves it back", async ({ page }) => {
   await open(page);
   const path = "Mood/mood_002.jpg";
+  const has = (p: string) => page.evaluate((x) => (window as unknown as { __locus: Hook }).__locus.session.board.items.has(x), p);
   const from = await centerOf(page, path);
   const to = await groupCenter(page, "Props");
+
+  // Cancel leaves the file where it was.
   await drag(page, from, to);
+  const dialog = page.getByTestId("confirm");
+  await expect(dialog).toContainText("Move “mood_002.jpg” to “Props”?");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+  expect(await has(path)).toBe(true);
+
+  await drag(page, from, to);
+  await dialog.getByRole("button", { name: "Move", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Moved mood_002.jpg to Props");
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __locus: Hook }).__locus.session.board.items.has("Props/mood_002.jpg"))).toBe(true);
+  await expect.poll(() => has("Props/mood_002.jpg")).toBe(true);
+
+  // Undo moves the file on disk too, so it asks again.
   await page.keyboard.press("Control+z");
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __locus: Hook }).__locus.session.board.items.has("Mood/mood_002.jpg"))).toBe(true);
+  await expect(dialog).toContainText("back?");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => has(path)).toBe(true);
 });
 
 test("a board of 3,000 images opens and stays interactive", async ({ page }) => {
@@ -127,4 +142,24 @@ test("online-only images download by themselves and take their real shape", asyn
   expect(shapes.unknown).toBe(0);
   expect(shapes.wrong).toBe(0);
   expect(shapes.square).toBeLessThan(120);
+});
+
+test("the board holds still while zooming during downloads", async ({ page }) => {
+  await page.goto(`/?n=600&cloud=0.8&stats`);
+  await page.waitForFunction(() => "__locus" in window);
+  await expect(page.getByTestId("cloud-status")).toBeVisible();
+  const where = () =>
+    page.evaluate(() => {
+      const { session } = (window as unknown as { __locus: { session: { board: { drawItems: { path: string; wx: number; wy: number }[] } } } }).__locus;
+      return session.board.drawItems.map((it) => `${it.path}:${Math.round(it.wx)},${Math.round(it.wy)}`).join("|");
+    });
+  const box = (await page.getByTestId("canvas").boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, -200);
+  const before = await where();
+  for (let i = 0; i < 12; i += 1) {
+    await page.mouse.wheel(0, i % 2 ? 120 : -120);
+    await page.waitForTimeout(150);
+  }
+  expect(await where()).toBe(before);
 });

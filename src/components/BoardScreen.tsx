@@ -4,12 +4,13 @@ import type { GroupNode, ItemNode } from "../lib/board";
 import { tidy } from "../lib/board.js";
 import type { Session } from "../lib/session";
 import { Scene, snapshot } from "../canvas/scene.js";
-import { type Theme, prefs } from "../lib/prefs.js";
+import { FOLDER_STYLES, type FolderStyle, type Theme, prefs } from "../lib/prefs.js";
 import { Toolbar } from "./Toolbar.js";
 import { Sidebar } from "./Sidebar.js";
 import { Viewer } from "./Viewer.js";
 import { ContextMenu, type MenuItem } from "./ContextMenu.js";
 import { CloudStatus } from "./CloudStatus.js";
+import { ConfirmDialog, type ConfirmRequest } from "./ConfirmDialog.js";
 
 interface Props {
   backend: Backend;
@@ -32,12 +33,18 @@ export function BoardScreen({ backend, session, theme, onTheme, onClose }: Props
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<number | null>(null);
   const [sidebar, setSidebar] = useState(prefs.sidebar());
+  const [folderStyle, setFolderStyle] = useState<FolderStyle>(() => {
+    const fromUrl = new URLSearchParams(location.search).get("folders");
+    return (FOLDER_STYLES as readonly string[]).includes(fromUrl ?? "") ? (fromUrl as FolderStyle) : prefs.folderStyle();
+  });
+  const folderStyleRef = useRef(folderStyle);
   const [viewer, setViewer] = useState<ItemNode | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; items: (MenuItem | "-")[] } | null>(null);
   const [notice, setNotice] = useState<{ text: string; undo?: () => void } | null>(null);
   const [stats, setStats] = useState({ visible: 0, drawCalls: 0, fps: 0, atlas: 0, loading: false });
   const [selected, setSelected] = useState(0);
   const [cloudLeft, setCloudLeft] = useState(0);
+  const [confirmReq, setConfirmReq] = useState<ConfirmRequest | null>(null);
   const [cloudPaused, setCloudPaused] = useState(false);
   const showStats = new URLSearchParams(location.search).has("stats");
 
@@ -56,6 +63,7 @@ export function BoardScreen({ backend, session, theme, onTheme, onClose }: Props
       sizesLearned: (items) => session.write(items, [])
     });
     sceneRef.current = scene;
+    scene.hierarchy = folderStyleRef.current;
     if (!backend.native) (window as unknown as { __locus: unknown }).__locus = { session, scene };
     scene.setBoard(session.board, false);
     session.onBoard = (b, keep) => {
@@ -63,6 +71,7 @@ export function BoardScreen({ backend, session, theme, onTheme, onClose }: Props
       setVersion((v) => v + 1);
     };
     session.onNotice = (text, undo) => setNotice({ text, undo });
+    session.ask = (q) => new Promise((resolve) => setConfirmReq({ ...q, resolve }));
     const offFiles = backend.on("files-changed", () => void session.reload(true));
     const offLayout = backend.on("layout-changed", () => void session.reload(true));
     return () => {
@@ -85,6 +94,16 @@ export function BoardScreen({ backend, session, theme, onTheme, onClose }: Props
   useEffect(() => {
     prefs.setSidebar(sidebar);
   }, [sidebar]);
+
+  useEffect(() => {
+    folderStyleRef.current = folderStyle;
+    prefs.setFolderStyle(folderStyle);
+    const scene = sceneRef.current;
+    if (scene) {
+      scene.hierarchy = folderStyle;
+      scene.invalidate();
+    }
+  }, [folderStyle]);
 
   useEffect(() => {
     if (!notice) return;
@@ -119,8 +138,8 @@ export function BoardScreen({ backend, session, theme, onTheme, onClose }: Props
     session.onBoard(session.board, true);
   };
 
-  const newFolder = (parent: GroupNode) => {
-    const name = window.prompt(`New folder in “${parent.name}”`, "New folder");
+  const newFolder = async (parent: GroupNode) => {
+    const name = await session.ask({ title: `New folder in “${parent.name || "the board folder"}”`, input: "New folder", confirm: "Create" });
     if (name) void session.createFolder(parent, name.trim());
   };
 
@@ -187,7 +206,7 @@ export function BoardScreen({ backend, session, theme, onTheme, onClose }: Props
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const scene = sceneRef.current;
-      if (!scene || viewer) return;
+      if (!scene || viewer || confirmReq) return;
       const typing = (e.target as HTMLElement)?.closest?.("input, textarea, select");
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); runCommand(e.shiftKey ? "redo" : "undo"); return; }
@@ -220,7 +239,7 @@ export function BoardScreen({ backend, session, theme, onTheme, onClose }: Props
       window.removeEventListener("keyup", up);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewer, runCommand, board]);
+  }, [viewer, runCommand, board, confirmReq]);
 
   const onQuery = (q: string) => {
     setQuery(q);
@@ -251,6 +270,8 @@ export function BoardScreen({ backend, session, theme, onTheme, onClose }: Props
         matches={matches}
         searchRef={searchRef}
         theme={theme}
+        folderStyle={folderStyle}
+        onFolderStyle={setFolderStyle}
         sidebar={sidebar}
         onQuery={onQuery}
         onSearchKey={onSearchKey}
@@ -284,6 +305,7 @@ export function BoardScreen({ backend, session, theme, onTheme, onClose }: Props
       </div>
       {viewer && <Viewer item={viewer} source={viewerSource} onStep={step} onClose={() => setViewer(null)} />}
       {menu && <ContextMenu {...menu} onClose={() => setMenu(null)} />}
+      {confirmReq && <ConfirmDialog req={confirmReq} onDone={() => setConfirmReq(null)} />}
       {notice && (
         <div className="toast" role="status">
           <span>{notice.text}</span>

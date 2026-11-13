@@ -109,3 +109,33 @@ describe("board", () => {
     expect(board.items.get("a/img 1.jpg")!.isNew).toBe(true);
   });
 });
+
+describe("rescans while images download", () => {
+  it("keep learned shapes and box widths, so nothing jumps", () => {
+    const s = scan();
+    // Folder c is online-only: sizes unknown at scan time.
+    for (const img of s.images) if (img.folder === "c") Object.assign(img, { width: 0, height: 0, onlineOnly: true });
+    const first = buildBoard(s, emptyLayout, null);
+    const c = first.items.get("c/img 0.jpg")!;
+    expect(c.aspect).toBe(1);
+    // A download teaches the board the real shape; boxes keep their width.
+    for (const it of first.groups.get("c")!.items) it.aspect = 16 / 9;
+    for (const g of first.groups.values()) if (!g.hasRec) g.keepW = g.w;
+    layoutBoard(first);
+    const widths = new Map([...first.groups.values()].map((g) => [g.path, g.w]));
+    const pos = { x: first.items.get("a/img 3.jpg")!.wx, y: first.items.get("a/img 3.jpg")!.wy };
+
+    // The sync app touches files, a rescan runs, the files are still online-only.
+    const again = buildBoard(scan_withCloud(), emptyLayout, null, first);
+    expect(again.items.get("c/img 0.jpg")!.aspect).toBeCloseTo(16 / 9);
+    for (const g of again.groups.values()) expect(g.w).toBe(widths.get(g.path));
+    expect(again.items.get("a/img 3.jpg")!.wx).toBe(pos.x);
+    expect(again.items.get("a/img 3.jpg")!.wy).toBe(pos.y);
+  });
+});
+
+function scan_withCloud() {
+  const s = scan();
+  for (const img of s.images) if (img.folder === "c") Object.assign(img, { width: 0, height: 0, onlineOnly: true });
+  return s;
+}
