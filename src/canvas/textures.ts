@@ -1,4 +1,4 @@
-import type { Tier } from "../types";
+import type { LoadedThumb, Tier } from "../types";
 
 // Texture management. Three levels of detail per image:
 //   atlas  64 px tiles in a texture array (every image, so a zoomed-out board
@@ -7,6 +7,10 @@ import type { Tier } from "../types";
 //   1024   its own texture beyond that.
 // Requests are prioritised every frame by what is on screen (biggest first),
 // then the rest of the board fills the atlas in the background.
+//
+// Online-only files (Google Drive, Dropbox) are downloaded by reading them, so
+// they have their own request slots: a slow download never blocks local
+// thumbnails, and their background fill can be paused.
 
 export const CELL = 64;
 const ATLAS = 2048;
@@ -25,7 +29,10 @@ interface Single {
   used: number;
 }
 
-export type Loader = (path: string, tier: Tier) => Promise<Blob>;
+export type Loader = (path: string, tier: Tier) => Promise<LoadedThumb>;
+
+const LOCAL_SLOTS = 8;
+const CLOUD_SLOTS = 6;
 
 export class TextureStore {
   private gl: WebGL2RenderingContext;
@@ -36,12 +43,20 @@ export class TextureStore {
   readonly atlas = new Map<string, AtlasSlot & { index: number }>();
   private singles = new Map<string, Single>();
   private singleBytes = 0;
-  private inflight = new Map<string, number>();
+  private inflight = new Map<string, boolean>();
+  private cloudInflight = 0;
   private failed = new Map<string, number>();
   private wants: { key: string; path: string; tier: Tier | "atlas"; prio: number }[] = [];
   private frame = 0;
   private background: string[] = [];
   private backgroundAt = 0;
+  private cloudBackground: string[] = [];
+  private cloudBackgroundAt = 0;
+  /** Stop downloading online-only files except ones big enough on screen to look at. */
+  cloudPaused = false;
+  isCloud: (path: string) => boolean = () => false;
+  /** Called with the pixel size from disk, or else the thumbnail's own size. */
+  onSize: (path: string, w: number, h: number, exact: boolean) => void = () => {};
   onChange: () => void = () => {};
   stats = { atlas: 0, singles: 0, loaded: 0, failed: 0 };
 
@@ -97,6 +112,7 @@ export class TextureStore {
       if (!paths.has(key.slice(0, key.lastIndexOf("|")))) this.dropSingle(key, s);
     }
     this.background = this.background.filter((p) => paths.has(p));
+    this.cloudBackground = this.cloudBackground.filter((p) => paths.has(p));
   }
 
   single(path: string, tier: Tier): WebGLTexture | null {
@@ -122,36 +138,64 @@ export class TextureStore {
 
   /** Every image on the board, nearest to the view first, for background atlas fill. */
   setBackground(paths: string[]) {
-    this.background = paths;
+    this.background = paths.filter((p) => !this.isCloud(p));
+    this.cloudBackground = paths.filter((p) => this.isCloud(p));
     this.backgroundAt = 0;
+    this.cloudBackgroundAt = 0;
+  }
+
+  /** Online-only images still waiting for a background download. */
+  get cloudLeft() {
+    let n = 0;
+    for (let i = this.cloudBackgroundAt; i < this.cloudBackground.length; i += 1) {
+      const p = this.cloudBackground[i];
+      if (!this.atlas.has(p) && !this.failed.has(`${p}|atlas`)) n += 1;
+    }
+    return n + this.cloudInflight;
   }
 
   pump() {
-    const limit = 8;
+    const localFree = () => this.inflight.size - this.cloudInflight < LOCAL_SLOTS;
+    const cloudFree = () => this.cloudInflight < CLOUD_SLOTS;
     this.wants.sort((a, b) => b.prio - a.prio);
     for (const w of this.wants) {
-      if (this.inflight.size >= limit) return;
-      this.start(w.key, w.path, w.tier);
+      const cloud = this.isCloud(w.path);
+      // Paused: only online-only images big enough on screen to look at still download.
+      if (cloud && this.cloudPaused && w.tier === "atlas") continue;
+      if (cloud ? cloudFree() : localFree()) this.start(w.key, w.path, w.tier, cloud);
+      if (!localFree() && !cloudFree()) return;
     }
-    while (this.inflight.size < limit && this.backgroundAt < this.background.length) {
-      const path = this.background[this.backgroundAt++];
-      const key = `${path}|atlas`;
-      if (this.atlas.has(path) || this.inflight.has(key) || this.failed.has(key)) continue;
-      this.start(key, path, "atlas");
-    }
+    const fill = (list: string[], at: number, free: () => boolean, cloud: boolean) => {
+      while (free() && at < list.length) {
+        const path = list[at++];
+        const key = `${path}|atlas`;
+        if (this.atlas.has(path) || this.inflight.has(key) || this.failed.has(key)) continue;
+        this.start(key, path, "atlas", cloud);
+      }
+      return at;
+    };
+    this.backgroundAt = fill(this.background, this.backgroundAt, localFree, false);
+    if (!this.cloudPaused) this.cloudBackgroundAt = fill(this.cloudBackground, this.cloudBackgroundAt, cloudFree, true);
   }
 
   get busy() {
-    return this.inflight.size > 0 || this.backgroundAt < this.background.length;
+    return (
+      this.inflight.size > 0 ||
+      this.backgroundAt < this.background.length ||
+      (!this.cloudPaused && this.cloudBackgroundAt < this.cloudBackground.length)
+    );
   }
 
-  private start(key: string, path: string, tier: Tier | "atlas") {
-    this.inflight.set(key, this.frame);
+  private start(key: string, path: string, tier: Tier | "atlas", cloud: boolean) {
+    this.inflight.set(key, cloud);
+    if (cloud) this.cloudInflight += 1;
     const source: Tier = tier === "atlas" ? "256" : tier;
     this.load(path, source)
-      .then(async (blob) => {
+      .then(async ({ blob, size }) => {
+        if (size) this.onSize(path, size[0], size[1], true);
         if (tier === "atlas") {
           const probe = await createImageBitmap(blob, { premultiplyAlpha: "none" });
+          if (!size) this.onSize(path, probe.width, probe.height, false);
           const scale = CELL / Math.max(probe.width, probe.height);
           const w = Math.max(1, Math.round(probe.width * scale));
           const h = Math.max(1, Math.round(probe.height * scale));
@@ -162,6 +206,7 @@ export class TextureStore {
           // A 256 fetch also serves as the 256 texture if the image is near.
         } else {
           const bmp = await createImageBitmap(blob, { premultiplyAlpha: "none" });
+          if (!size) this.onSize(path, bmp.width, bmp.height, false);
           this.putSingle(key, bmp);
           if (tier === "256" && !this.atlas.has(path)) {
             const scale = CELL / Math.max(bmp.width, bmp.height);
@@ -184,6 +229,7 @@ export class TextureStore {
       })
       .finally(() => {
         this.inflight.delete(key);
+        if (cloud) this.cloudInflight -= 1;
         this.onChange();
       });
   }

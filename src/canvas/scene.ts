@@ -19,6 +19,10 @@ export interface SceneEvents {
   contextMenu(target: ItemNode | GroupNode | null, screen: { x: number; y: number }): void;
   selectionChanged(count: number): void;
   stats(s: { visible: number; drawCalls: number; fps: number; atlas: number; loading: boolean }): void;
+  /** Online-only images still to download in the background. */
+  cloudLeft(n: number): void;
+  /** Images whose shape was learned from a download and that have stored records. */
+  sizesLearned(items: ItemNode[]): void;
 }
 
 export interface Snapshot {
@@ -84,6 +88,9 @@ export class Scene {
   private ro: ResizeObserver;
   private disposed = false;
   private listeners = new AbortController();
+  private resized = new Set<ItemNode>();
+  private resizeTimer = 0;
+  private lastCloudLeft = -1;
 
   constructor(
     private host: HTMLElement,
@@ -95,6 +102,8 @@ export class Scene {
     this.renderer = new Renderer(canvas);
     this.textures = new TextureStore(this.renderer.gl, load);
     this.textures.onChange = () => this.invalidate();
+    this.textures.isCloud = (p) => this.board?.items.get(p)?.img.onlineOnly ?? false;
+    this.textures.onSize = (p, w, h, exact) => this.learnSize(p, w, h, exact);
     this.selBox = this.el("div", "sel");
     this.selBox.innerHTML = '<span class="sel-handle" data-handle="scale"></span><span class="sel-rotate" data-handle="rotate"></span>';
     this.marquee = this.el("div", "marquee");
@@ -111,6 +120,47 @@ export class Scene {
     e.hidden = true;
     this.overlay.appendChild(e);
     return e;
+  }
+
+  /** A file that was online-only at scan time has arrived: give it its real
+   *  shape. Layout is redone at most a few times a second while downloads run,
+   *  and never in the middle of a drag. */
+  private learnSize(path: string, w: number, h: number, exact: boolean) {
+    const it = this.board?.items.get(path);
+    if (!it || w <= 0 || h <= 0) return;
+    if (exact) {
+      it.img.width = w;
+      it.img.height = h;
+      it.img.onlineOnly = false;
+    } else if (it.img.width > 0) {
+      return; // the scan already knew; a thumbnail's rounding is no better
+    }
+    const aspect = w / h;
+    if (Math.abs(aspect - it.aspect) / it.aspect < 0.01) return;
+    it.aspect = aspect;
+    this.resized.add(it);
+    if (!this.resizeTimer) this.resizeTimer = window.setTimeout(() => this.applySizes(), 400);
+  }
+
+  private applySizes() {
+    this.resizeTimer = 0;
+    if (this.disposed || !this.board || !this.resized.size) return;
+    if (this.drag) {
+      this.resizeTimer = window.setTimeout(() => this.applySizes(), 400);
+      return;
+    }
+    const items = [...this.resized].filter((it) => this.board!.items.get(it.path) === it);
+    this.resized.clear();
+    layoutBoard(this.board);
+    this.invalidate();
+    const stored = items.filter((it) => it.group.mode === "free");
+    if (stored.length) this.events.sizesLearned(stored);
+  }
+
+  /** Stop or resume background downloads of online-only files. */
+  setCloudPaused(paused: boolean) {
+    this.textures.cloudPaused = paused;
+    this.invalidate();
   }
 
   readColors() {
@@ -327,6 +377,11 @@ export class Scene {
         .map((x) => x.p);
       this.textures.setBackground(order);
     }
+    const left = this.textures.cloudLeft;
+    if (left !== this.lastCloudLeft) {
+      this.lastCloudLeft = left;
+      this.events.cloudLeft(left);
+    }
 
     this.drawOverlay(vx0, vy0, vx1, vy1);
     const fps = this.frames.length;
@@ -397,7 +452,9 @@ export class Scene {
     const host = this.host;
     const signal = this.listeners.signal;
     host.addEventListener("wheel", (e) => this.onWheel(e), { passive: false, signal });
-    host.addEventListener("pointerdown", (e) => this.onDown(e), { signal });
+    // Controls floating over the canvas (download status) handle their own clicks.
+    const onControl = (e: Event) => !!(e.target as HTMLElement | null)?.closest?.("[data-canvas-control]");
+    host.addEventListener("pointerdown", (e) => !onControl(e) && this.onDown(e), { signal });
     host.addEventListener("pointermove", (e) => this.onMove(e), { signal });
     host.addEventListener("pointerup", (e) => this.onUp(e), { signal });
     host.addEventListener("pointercancel", () => { this.drag = null; this.marquee.hidden = true; }, { signal });
@@ -666,6 +723,7 @@ export class Scene {
     this.listeners.abort();
     cancelAnimationFrame(this.raf);
     this.ro.disconnect();
+    window.clearTimeout(this.resizeTimer);
     this.textures.dispose();
     this.overlay.innerHTML = "";
   }

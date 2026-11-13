@@ -96,3 +96,35 @@ test("a board of 3,000 images opens and stays interactive", async ({ page }) => 
   for (let i = 0; i < 10; i += 1) await page.mouse.wheel(0, -120);
   await expect(page.getByTestId("stats")).not.toContainText("3,000 visible");
 });
+
+test("online-only images download by themselves and take their real shape", async ({ page }) => {
+  await page.goto(`/?n=400&cloud=0.7&stats`);
+  await page.waitForFunction(() => "__locus" in window);
+  const status = page.getByTestId("cloud-status");
+  await expect(status).toBeVisible();
+  await expect(status).toContainText("left");
+
+  // Pausing stops the background downloads; resuming finishes them.
+  await status.getByRole("button", { name: "Pause" }).click();
+  await expect(status).toContainText("Downloads paused");
+  await page.waitForTimeout(600); // downloads already running finish
+  const pausedAt = await status.textContent();
+  await page.waitForTimeout(1000);
+  await expect(status).toHaveText(pausedAt!);
+  await status.getByRole("button", { name: "Resume" }).click();
+  await expect(status).toBeHidden({ timeout: 30_000 });
+
+  // Every image now has its real size and a non-square shape where it should.
+  const shapes = await page.evaluate(() => {
+    const { session } = (window as unknown as { __locus: { session: { board: { items: Map<string, { aspect: number; img: { width: number; height: number; onlineOnly: boolean } }> } } } }).__locus;
+    const all = [...session.board.items.values()];
+    return {
+      unknown: all.filter((it) => !it.img.width).length,
+      wrong: all.filter((it) => Math.abs(it.aspect - it.img.width / it.img.height) > 0.02).length,
+      square: all.filter((it) => Math.abs(it.aspect - 1) < 0.01).length
+    };
+  });
+  expect(shapes.unknown).toBe(0);
+  expect(shapes.wrong).toBe(0);
+  expect(shapes.square).toBeLessThan(120);
+});

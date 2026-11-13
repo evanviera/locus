@@ -3,6 +3,8 @@ import type { BoardPayload, Folder, ImageEntry, LayoutDoc, MergedLayout, Tier } 
 
 // A generated pre-production folder tree, so the canvas can be developed and
 // tested in a plain browser. `?n=3000` sets the image count; `?seed=` varies it.
+// `?cloud=0.6` makes that share of images online-only: their size is unknown
+// until they are "downloaded", which takes longer, like Google Drive.
 
 const SECTIONS: Record<string, string[]> = {
   Characters: ["Hero", "Sidekick", "Villain", "Crowd"],
@@ -99,6 +101,13 @@ export function mockBackend(): Backend {
   const n = Number(params.get("n") ?? 600);
   const seed = Number(params.get("seed") ?? 7);
   let { folders, images } = buildTree(n, seed);
+  const cloudShare = Number(params.get("cloud") ?? 0);
+  // Real sizes stay here; the scan reports 0×0 for online-only files.
+  const real = new Map(images.map((img) => [img.path, { ...img }]));
+  if (cloudShare > 0) {
+    const pick = rng(seed + 1);
+    images = images.map((img) => (pick() < cloudShare ? { ...img, width: 0, height: 0, onlineOnly: true } : img));
+  }
   let own: LayoutDoc = { version: 1, device: "browser", clock: 0, items: {}, groups: {} };
   const listeners = new Map<string, Set<(p: string) => void>>();
   const emit = (event: string, payload = "") => listeners.get(event)?.forEach((h) => h(payload));
@@ -156,9 +165,16 @@ export function mockBackend(): Backend {
     async loadThumb(path: string, tier: Tier) {
       const img = byPath(path);
       if (!img) throw new Error("missing");
-      // Simulate decode cost so loading order is visible in the browser build.
-      await new Promise((r) => setTimeout(r, tier === "256" ? 2 : 8));
-      return paint(img, tier === "256" ? 256 : tier === "1024" ? 1024 : 2048);
+      // Simulate decode cost so loading order is visible in the browser build,
+      // and a download for online-only files.
+      const full = real.get(img.path) ?? img;
+      const delay = (tier === "256" ? 2 : 8) + (img.onlineOnly ? 40 + (hash(path) % 120) : 0);
+      await new Promise((r) => setTimeout(r, delay));
+      if (img.onlineOnly) {
+        Object.assign(img, { width: full.width, height: full.height, onlineOnly: false });
+      }
+      const blob = await paint(full, tier === "256" ? 256 : tier === "1024" ? 1024 : 2048);
+      return { blob, size: [full.width, full.height] as [number, number] };
     },
     on(event, handler) {
       const set = listeners.get(event) ?? new Set();
