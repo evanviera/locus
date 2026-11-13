@@ -70,8 +70,11 @@ export function BoardScreen({ backend, session, theme, onTheme, onClose }: Props
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
+  // The theme attribute is set by App's effect, which runs after this one, so
+  // read the new colors on the next frame.
   useEffect(() => {
-    sceneRef.current?.readColors();
+    const id = requestAnimationFrame(() => sceneRef.current?.readColors());
+    return () => cancelAnimationFrame(id);
   }, [theme]);
 
   useEffect(() => {
