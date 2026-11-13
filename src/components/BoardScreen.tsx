@@ -9,6 +9,7 @@ import { Toolbar } from "./Toolbar.js";
 import { Sidebar } from "./Sidebar.js";
 import { Viewer } from "./Viewer.js";
 import { ContextMenu, type MenuItem } from "./ContextMenu.js";
+import { CloudStatus } from "./CloudStatus.js";
 
 interface Props {
   backend: Backend;
@@ -36,6 +37,8 @@ export function BoardScreen({ backend, session, theme, onTheme, onClose }: Props
   const [notice, setNotice] = useState<{ text: string; undo?: () => void } | null>(null);
   const [stats, setStats] = useState({ visible: 0, drawCalls: 0, fps: 0, atlas: 0, loading: false });
   const [selected, setSelected] = useState(0);
+  const [cloudLeft, setCloudLeft] = useState(0);
+  const [cloudPaused, setCloudPaused] = useState(false);
   const showStats = new URLSearchParams(location.search).has("stats");
 
   const board = session.board;
@@ -48,7 +51,9 @@ export function BoardScreen({ backend, session, theme, onTheme, onClose }: Props
       openViewer: (it) => setViewer(it),
       contextMenu: (target, at) => openMenu(target, at),
       selectionChanged: (n) => setSelected(n),
-      stats: (s) => showStats && setStats(s)
+      stats: (s) => showStats && setStats(s),
+      cloudLeft: (n) => setCloudLeft(n),
+      sizesLearned: (items) => session.write(items, [])
     });
     sceneRef.current = scene;
     if (!backend.native) (window as unknown as { __locus: unknown }).__locus = { session, scene };
@@ -100,7 +105,7 @@ export function BoardScreen({ backend, session, theme, onTheme, onClose }: Props
 
   const viewerSource = useCallback(
     (it: ItemNode) =>
-      backend.native ? Promise.resolve(backend.thumbUrl(it.path, "full")) : backend.loadThumb(it.path, "full").then((b) => URL.createObjectURL(b)),
+      backend.native ? Promise.resolve(backend.thumbUrl(it.path, "full")) : backend.loadThumb(it.path, "full").then((t) => URL.createObjectURL(t.blob)),
     [backend]
   );
 
@@ -265,6 +270,16 @@ export function BoardScreen({ backend, session, theme, onTheme, onClose }: Props
             </div>
           )}
           {selected > 1 && <div className="selection-count">{selected} selected</div>}
+          {cloudLeft > 0 && (
+            <CloudStatus
+              left={cloudLeft}
+              paused={cloudPaused}
+              onToggle={() => {
+                sceneRef.current?.setCloudPaused(!cloudPaused);
+                setCloudPaused(!cloudPaused);
+              }}
+            />
+          )}
         </div>
       </div>
       {viewer && <Viewer item={viewer} source={viewerSource} onStep={step} onClose={() => setViewer(null)} />}

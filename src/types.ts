@@ -17,6 +17,12 @@ export interface ImageEntry {
   onlineOnly: boolean;
 }
 
+/** A thumbnail and, when the file is on disk, its pixel size. */
+export interface LoadedThumb {
+  blob: Blob;
+  size?: [number, number];
+}
+
 export interface ScanResult {
   root: string;
   folders: Folder[];

@@ -184,19 +184,22 @@ fn shared_file(root: &Path, path: &Path) -> Option<PathBuf> {
     Some(root.join(crate::scan::BOARD_DIR).join("thumbs").join(&key[..2]).join(format!("{key}.jpg")))
 }
 
-fn is_online_only(path: &Path) -> bool {
+pub fn is_online_only(path: &Path) -> bool {
     fs::metadata(path).map(|m| crate::scan::online_only(&m)).unwrap_or(false)
 }
 
-/// Board-aware lookup: never reads an online-only original in the background
-/// (only the viewer's Full tier may download it), serves the shared preview
-/// when there is one, and publishes a shared preview after building one.
+/// Board-aware lookup. For an online-only original (Google Drive, Dropbox,
+/// OneDrive placeholders) the small tier comes from the shared preview when a
+/// teammate already made one; otherwise the original is read, which makes the
+/// sync app download it. The caller runs those reads on the cloud pool so a
+/// slow download never holds up local thumbnails. After building a small
+/// thumbnail it publishes a shared preview, so nobody else has to download it.
 pub fn get_for_board(root: &Path, path: &Path, tier: Tier, cache_dir: &Path) -> Result<Thumb, String> {
     let shared = shared_file(root, path);
-    if tier != Tier::Full && is_online_only(path) {
-        let file = shared.ok_or("online-only")?;
-        let bytes = fs::read(file).map_err(|_| "online-only".to_string())?;
-        return Ok(Thumb { bytes, mime: "image/jpeg" });
+    if tier == Tier::Small && is_online_only(path) {
+        if let Some(bytes) = shared.as_ref().and_then(|f| fs::read(f).ok()) {
+            return Ok(Thumb { bytes, mime: "image/jpeg" });
+        }
     }
     let thumb = get(path, tier, cache_dir)?;
     if tier == Tier::Small {

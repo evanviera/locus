@@ -61,6 +61,26 @@ pub struct DimCache {
     map: Mutex<HashMap<(PathBuf, u64, u64), (u32, u32)>>,
 }
 
+impl DimCache {
+    /// Pixel size of a local file (from the cache or its header). None for an
+    /// online-only file, whose header can't be read without downloading it.
+    pub fn size_of(&self, path: &Path) -> Option<(u32, u32)> {
+        let meta = std::fs::metadata(path).ok()?;
+        if online_only(&meta) {
+            return None;
+        }
+        let key = (path.to_path_buf(), meta.len(), mtime_ms(&meta));
+        if let Some(d) = self.map.lock().ok().and_then(|m| m.get(&key).copied()) {
+            return Some(d);
+        }
+        let d = header_size(path)?;
+        if let Ok(mut m) = self.map.lock() {
+            m.insert(key, d);
+        }
+        Some(d)
+    }
+}
+
 pub fn rel_path(root: &Path, path: &Path) -> String {
     let rel = path.strip_prefix(root).unwrap_or(path);
     rel.components()
@@ -127,7 +147,7 @@ pub fn mtime_ms(meta: &std::fs::Metadata) -> u64 {
 
 /// Pixel size from the header. PSD headers are read by hand (width/height at
 /// fixed offsets) because imagesize treats them as unknown on some versions.
-fn header_size(path: &Path) -> Option<(u32, u32)> {
+pub fn header_size(path: &Path) -> Option<(u32, u32)> {
     if let Ok(size) = imagesize::size(path) {
         return Some((size.width as u32, size.height as u32));
     }

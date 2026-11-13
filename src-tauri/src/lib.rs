@@ -25,6 +25,9 @@ struct AppState {
     dims: DimCache,
     device: String,
     cache_dir: PathBuf,
+    /// Reads of online-only files wait on a download, so they get their own
+    /// few threads and never hold up local thumbnails.
+    cloud: rayon::ThreadPool,
 }
 
 #[derive(Serialize)]
@@ -170,34 +173,43 @@ fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// `thumb://localhost/<tier>/<url-encoded relative path>` → image bytes.
-fn serve_thumb(state: &AppState, uri_path: &str) -> http::Response<Vec<u8>> {
-    let respond = |status: u16, mime: &str, body: Vec<u8>| {
-        http::Response::builder()
-            .status(status)
-            .header("Content-Type", mime)
-            .header("Access-Control-Allow-Origin", "*")
-            .header("Cache-Control", "no-store")
-            .body(body)
-            .unwrap()
-    };
-    // The frontend encodes "<tier>/<path>" as one URI component.
+fn respond(status: u16, mime: &str, body: Vec<u8>, size: Option<(u32, u32)>) -> http::Response<Vec<u8>> {
+    let mut res = http::Response::builder()
+        .status(status)
+        .header("Content-Type", mime)
+        .header("Access-Control-Allow-Origin", "*")
+        .header("Access-Control-Expose-Headers", "X-Image-Size")
+        .header("Cache-Control", "no-store");
+    if let Some((w, h)) = size {
+        res = res.header("X-Image-Size", format!("{w}x{h}"));
+    }
+    res.body(body).unwrap()
+}
+
+/// `thumb://localhost/<tier>/<url-encoded relative path>` → tier and path.
+/// The frontend encodes "<tier>/<path>" as one URI component.
+fn parse_thumb(state: &AppState, uri_path: &str) -> Result<(thumbs::Tier, PathBuf, PathBuf), u16> {
     let decoded = percent_decode(uri_path);
     let trimmed = decoded.trim_start_matches('/');
-    let Some((tier, rel)) = trimmed.split_once('/') else {
-        return respond(400, "text/plain", b"bad path".to_vec());
-    };
-    let (Some(tier), Ok(root)) = (thumbs::Tier::parse(tier), current_root(state)) else {
-        return respond(404, "text/plain", Vec::new());
-    };
-    let rel = rel.to_string();
+    let (tier, rel) = trimmed.split_once('/').ok_or(400u16)?;
+    let tier = thumbs::Tier::parse(tier).ok_or(404u16)?;
+    let root = current_root(state).map_err(|_| 404u16)?;
     if rel.split('/').any(|s| s == "..") {
-        return respond(403, "text/plain", Vec::new());
+        return Err(403);
     }
-    let path = root.join(&rel);
-    match thumbs::get_for_board(&root, &path, tier, &state.cache_dir) {
-        Ok(t) => respond(200, t.mime, t.bytes),
-        Err(e) => respond(404, "text/plain", e.into_bytes()),
+    let path = root.join(rel);
+    Ok((tier, root, path))
+}
+
+/// Serves the image and, for the small tier, its pixel size in `X-Image-Size`
+/// so the board learns the shape of files that were online-only at scan time.
+fn serve_thumb(state: &AppState, tier: thumbs::Tier, root: &Path, path: &Path) -> http::Response<Vec<u8>> {
+    match thumbs::get_for_board(root, path, tier, &state.cache_dir) {
+        Ok(t) => {
+            let size = if tier == thumbs::Tier::Small { state.dims.size_of(path) } else { None };
+            respond(200, t.mime, t.bytes, size)
+        }
+        Err(e) => respond(404, "text/plain", e.into_bytes(), None),
     }
 }
 
@@ -213,6 +225,11 @@ pub fn run() {
                 dims: DimCache::default(),
                 device: device_id(&config_dir),
                 cache_dir,
+                cloud: rayon::ThreadPoolBuilder::new()
+                    .num_threads(6)
+                    .thread_name(|i| format!("locus-cloud-{i}"))
+                    .build()
+                    .expect("cloud thread pool"),
             });
             Ok(())
         })
@@ -221,10 +238,25 @@ pub fn run() {
         .register_asynchronous_uri_scheme_protocol("thumb", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
             let path = request.uri().path().to_string();
-            rayon::spawn(move || {
-                let state = app.state::<AppState>();
-                responder.respond(serve_thumb(&state, &path));
-            });
+            let state = app.state::<AppState>();
+            match parse_thumb(&state, &path) {
+                Err(status) => responder.respond(respond(status, "text/plain", Vec::new(), None)),
+                Ok((tier, root, file)) => {
+                    let cloud = thumbs::is_online_only(&file);
+                    let job = {
+                        let app = app.clone();
+                        move || {
+                            let state = app.state::<AppState>();
+                            responder.respond(serve_thumb(&state, tier, &root, &file));
+                        }
+                    };
+                    if cloud {
+                        state.cloud.spawn(job);
+                    } else {
+                        rayon::spawn(job);
+                    }
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             pick_folder,

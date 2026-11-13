@@ -1,4 +1,4 @@
-import type { BoardPayload, LayoutDoc, Tier } from "./types";
+import type { BoardPayload, LayoutDoc, LoadedThumb, Tier } from "./types";
 import { mockBackend } from "./lib/mockBackend.js";
 
 /** Everything the UI needs from the native side. The browser build (used by
@@ -15,7 +15,8 @@ export interface Backend {
   createFolder(parent: string, name: string): Promise<string>;
   reveal(path: string): Promise<void>;
   openFile(path: string): Promise<void>;
-  loadThumb(path: string, tier: Tier): Promise<Blob>;
+  /** A thumbnail; reading an online-only file makes the sync app download it. */
+  loadThumb(path: string, tier: Tier): Promise<LoadedThumb>;
   thumbUrl(path: string, tier: Tier): string;
   on(event: "files-changed" | "layout-changed" | "menu", handler: (payload: string) => void): () => void;
 }
@@ -42,7 +43,8 @@ async function tauriBackend(): Promise<Backend> {
     async loadThumb(path, tier) {
       const res = await fetch(url(path, tier));
       if (!res.ok) throw new Error(`thumb ${res.status}`);
-      return res.blob();
+      const m = /^(\d+)x(\d+)$/.exec(res.headers.get("X-Image-Size") ?? "");
+      return { blob: await res.blob(), size: m ? [Number(m[1]), Number(m[2])] : undefined };
     },
     on(event, handler) {
       const name = event === "menu" ? "menu" : `board:${event}`;

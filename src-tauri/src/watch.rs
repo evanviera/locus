@@ -2,7 +2,7 @@
 //! people's layout files trigger a layout reload. Events are debounced so a
 //! sync service dropping 500 files at once causes one rescan, not 500.
 
-use notify::{recommended_watcher, Event, RecursiveMode, Watcher};
+use notify::{event::ModifyKind, recommended_watcher, Event, EventKind, RecursiveMode, Watcher};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::Duration;
@@ -43,6 +43,11 @@ pub fn start(app: AppHandle, root: PathBuf, own_layout: PathBuf) -> notify::Resu
     let r = root.clone();
     let mut watcher = recommended_watcher(move |res: notify::Result<Event>| {
         if let Ok(event) = res {
+            // Reads, and a sync app downloading a file (flags and attributes
+            // change, the content doesn't), are not changes to the board.
+            if matches!(event.kind, EventKind::Access(_) | EventKind::Modify(ModifyKind::Metadata(_))) {
+                return;
+            }
             for p in &event.paths {
                 if let Some(kind) = classify(&r, p, &own_layout) {
                     let _ = tx.send(kind);
