@@ -1,0 +1,131 @@
+/* The canvas and the DOM layer drawn over it. */
+
+.canvas-host {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--ui-bg);
+  touch-action: none;
+}
+
+.canvas-host.panning {
+  cursor: grab;
+}
+
+.canvas-host canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.group-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--ui-space-4);
+  height: 20px;
+  overflow: hidden;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-weight-medium);
+  white-space: nowrap;
+  transform-origin: 0 0;
+}
+
+.group-label.tag {
+  height: 22px;
+  padding: 0 var(--ui-space-4);
+  align-items: center;
+  color: var(--ui-text);
+  background: var(--ui-surface-raised);
+  border-radius: var(--ui-radius-sm);
+}
+
+.group-label .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-label .count {
+  color: var(--ui-text-faint);
+  font-size: var(--ui-text-xs);
+}
+
+.sel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1px solid var(--ui-accent);
+  border-radius: 2px;
+  transform-origin: 0 0;
+}
+
+.sel-handle,
+.sel-rotate {
+  position: absolute;
+  display: none;
+  width: 10px;
+  height: 10px;
+  background: var(--ui-accent);
+  border: 2px solid var(--ui-ink);
+  border-radius: var(--ui-radius-pill);
+  pointer-events: auto;
+}
+
+.sel.single .sel-handle,
+.sel.single .sel-rotate {
+  display: block;
+}
+
+.sel-handle {
+  right: -6px;
+  bottom: -6px;
+  cursor: nwse-resize;
+}
+
+.sel-rotate {
+  top: -22px;
+  left: calc(50% - 5px);
+  cursor: grab;
+}
+
+.marquee {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: var(--ui-accent-soft);
+  border: 1px solid var(--ui-accent-border);
+}
+
+.stats,
+.selection-count {
+  position: absolute;
+  bottom: var(--ui-space-5);
+  padding: var(--ui-space-2) var(--ui-space-4);
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-xs);
+  background: var(--ui-surface-raised);
+  border-radius: var(--ui-radius-sm);
+  pointer-events: none;
+}
+
+.stats {
+  left: var(--ui-space-5);
+  font-family: var(--ui-font-mono);
+}
+
+.selection-count {
+  right: var(--ui-space-5);
+}

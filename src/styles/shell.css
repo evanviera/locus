@@ -1,0 +1,252 @@
+/* Welcome screen, toolbar, sidebar. */
+
+.welcome {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  padding: var(--ui-space-7);
+  background: var(--ui-bg);
+}
+
+.welcome-inner {
+  display: grid;
+  justify-items: start;
+  gap: var(--ui-space-6);
+  width: min(520px, 100%);
+}
+
+.welcome h1 {
+  margin: 0;
+  color: var(--ui-text-strong);
+  font-size: var(--ui-text-2xl);
+  font-weight: var(--ui-weight-semibold);
+  line-height: var(--ui-leading-tight);
+}
+
+.welcome-lede {
+  margin: 0;
+  color: var(--ui-text-muted);
+}
+
+.welcome-error {
+  margin: 0;
+  color: var(--ui-danger);
+  font-size: var(--ui-text-sm);
+}
+
+.recent {
+  width: 100%;
+  margin-top: var(--ui-space-6);
+}
+
+.recent h2 {
+  margin: 0 0 var(--ui-space-4);
+  color: var(--ui-text-faint);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-weight-medium);
+}
+
+.recent ul {
+  display: grid;
+  gap: var(--ui-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recent-item {
+  display: grid;
+  width: 100%;
+  padding: var(--ui-space-4) var(--ui-space-5);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+}
+
+.recent-item:hover {
+  background: var(--ui-surface-1);
+}
+
+.recent-name {
+  color: var(--ui-text-strong);
+  font-weight: var(--ui-weight-medium);
+}
+
+.recent-path {
+  overflow: hidden;
+  color: var(--ui-text-faint);
+  font-size: var(--ui-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-4);
+  height: 48px;
+  padding: 0 var(--ui-space-5);
+  color: var(--chrome-text);
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.toolbar .btn,
+.toolbar .select {
+  color: var(--chrome-text);
+  background: transparent;
+}
+
+.toolbar .btn:hover {
+  background: var(--chrome-hover);
+}
+
+.toolbar-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ui-space-5);
+  min-width: 0;
+  margin-right: auto;
+}
+
+.board-name {
+  overflow: hidden;
+  font-weight: var(--ui-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-meta {
+  overflow: hidden;
+  color: var(--chrome-muted);
+  font-size: var(--ui-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search {
+  position: relative;
+  width: min(320px, 32vw);
+}
+
+.search input {
+  width: 100%;
+  height: var(--ui-size-control-sm);
+  padding: 0 52px 0 var(--ui-space-5);
+  color: var(--chrome-text);
+  font-size: var(--ui-text-sm);
+  background: var(--chrome-hover);
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  user-select: text;
+}
+
+.search input::placeholder {
+  color: var(--chrome-muted);
+}
+
+.search-count {
+  position: absolute;
+  top: 50%;
+  right: var(--ui-space-5);
+  color: var(--chrome-muted);
+  font-size: var(--ui-text-xs);
+  transform: translateY(-50%);
+}
+
+.select {
+  height: var(--ui-size-control-sm);
+  padding: 0 var(--ui-space-4);
+  font-size: var(--ui-text-sm);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--ui-radius-sm);
+}
+
+.workspace {
+  display: flex;
+  min-height: 0;
+}
+
+.sidebar {
+  flex: 0 0 248px;
+  overflow: auto;
+  padding: var(--ui-space-5) var(--ui-space-4);
+  color: var(--chrome-text);
+  background: var(--chrome-bg);
+  border-right: 1px solid var(--chrome-border);
+}
+
+.sidebar-head {
+  padding: 0 var(--ui-space-4) var(--ui-space-4);
+  color: var(--chrome-muted);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-weight-medium);
+}
+
+.tree,
+.tree ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+}
+
+.tree-toggle {
+  display: inline-grid;
+  flex: 0 0 18px;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--chrome-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.tree-name {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+  min-width: 0;
+  height: 30px;
+  padding: 0 var(--ui-space-4);
+  color: var(--chrome-muted);
+  font-size: var(--ui-text-sm);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+}
+
+.tree-name span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-name:hover {
+  color: var(--chrome-text);
+  background: var(--chrome-hover);
+}
+
+.tree-count {
+  color: var(--chrome-muted);
+  font-size: var(--ui-text-xs);
+}

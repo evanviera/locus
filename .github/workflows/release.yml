@@ -1,0 +1,122 @@
+name: Release
+
+# The Forme app release pipeline (forme-website/app-kit). Identical in every app:
+# the app name comes from productName in src-tauri/tauri.conf.json.
+# Run it from the Actions tab with a version, or push a vX.Y.Z tag.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, without the leading v"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build ${{ matrix.platform.name }} release
+    runs-on: ${{ matrix.platform.runner }}
+
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        platform:
+          - name: macOS
+            runner: macos-latest
+          - name: Windows
+            runner: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Read the app name
+        shell: bash
+        run: echo "APP_NAME=$(node -p "require('./src-tauri/tauri.conf.json').productName")" >> "$GITHUB_ENV"
+
+      - name: Import Apple Developer certificate
+        if: matrix.platform.name == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          CERT_ID=$(security find-identity -v -p codesigning build.keychain | awk -F'"' '/Developer ID Application/ { print $2; exit }')
+          if [ -z "$CERT_ID" ]; then
+            echo "Developer ID Application identity not found in imported certificate."
+            security find-identity -v -p codesigning build.keychain
+            exit 1
+          fi
+          echo "APPLE_SIGNING_IDENTITY=$CERT_ID" >> "$GITHUB_ENV"
+
+      - name: Build and upload Tauri release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: ${{ env.APP_NAME }} ${{ env.RELEASE_TAG }}
+          releaseBody: "See the assets below to download and install ${{ env.APP_NAME }}."
+          # Draft until every platform has uploaded; the publish job below
+          # makes it public. A public release with only the macOS assets sends
+          # Windows downloads (and the "latest" links on forme.md) to a 404.
+          releaseDraft: true
+          releaseCommitish: ${{ github.sha }}
+          prerelease: false
+          uploadUpdaterJson: true
+
+  publish:
+    name: Publish release
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Installed copies reject updates signed with any key but the one in
+      # tauri.conf.json, so stop here (the release stays a draft) on a mismatch.
+      - name: Check updater signatures match the app's public key
+        run: |
+          gh release download "$RELEASE_TAG" --repo "${{ github.repository }}" --pattern "*.sig" --dir sigs
+          python3 scripts/check-updater-signatures.py sigs/*.sig
+
+      - name: Publish the draft once macOS and Windows assets are uploaded
+        run: gh release edit "$RELEASE_TAG" --repo "${{ github.repository }}" --draft=false --latest

@@ -1,0 +1,115 @@
+/* Viewer, context menu, toast and update bar. */
+
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  place-items: center;
+  background: var(--ui-overlay);
+  backdrop-filter: blur(2px);
+}
+
+.viewer img {
+  max-width: calc(100vw - 64px);
+  max-height: calc(100vh - 96px);
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity var(--ui-duration-fast);
+}
+
+.viewer img.loaded {
+  opacity: 1;
+}
+
+.viewer-meta {
+  display: flex;
+  gap: var(--ui-space-6);
+  max-width: 100%;
+  padding: var(--ui-space-5) var(--ui-space-6);
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-sm);
+}
+
+.viewer-name {
+  color: var(--ui-text-strong);
+  font-weight: var(--ui-weight-medium);
+}
+
+.viewer-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu {
+  position: fixed;
+  z-index: 30;
+  display: grid;
+  min-width: 220px;
+  padding: var(--ui-space-2);
+  background: var(--ui-surface-raised);
+  border: 1px solid var(--ui-border-soft);
+  border-radius: var(--ui-radius-sm);
+  box-shadow: var(--ui-shadow);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-6);
+  height: 30px;
+  padding: 0 var(--ui-space-4);
+  color: var(--ui-text);
+  font-size: var(--ui-text-sm);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+}
+
+.menu-item:hover:not(:disabled) {
+  color: var(--ui-text-strong);
+  background: var(--ui-surface-hover);
+}
+
+.menu-item:disabled {
+  color: var(--ui-text-faint);
+  cursor: default;
+}
+
+.menu-sep {
+  height: 1px;
+  margin: var(--ui-space-2) var(--ui-space-3);
+  background: var(--ui-border-soft);
+}
+
+.toast,
+.update-bar {
+  position: fixed;
+  left: 50%;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-5);
+  max-width: min(640px, calc(100vw - 32px));
+  padding: var(--ui-space-4) var(--ui-space-4) var(--ui-space-4) var(--ui-space-6);
+  color: var(--ui-text);
+  font-size: var(--ui-text-sm);
+  background: var(--ui-surface-raised);
+  border: 1px solid var(--ui-border-soft);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow);
+  transform: translateX(-50%);
+}
+
+.toast {
+  bottom: var(--ui-space-7);
+}
+
+.update-bar {
+  top: 60px;
+}

@@ -1,0 +1,231 @@
+/* Forme design tokens. GENERATED from tokens/tokens.json by
+   scripts/build-tokens.mjs. Do not edit by hand; change tokens.json and rebuild.
+
+   Copy this file into an app and import it before the app's own styles.
+   Dark is the default; set data-theme="light" on <html> for the light theme.
+   Chrome (sidebars, title bars, tool rails) stays ink in dark and light; the
+   mid-grade themes (data-theme="graphite" and so on) use their own chrome. */
+:root {
+  --ui-ink: #090909; /* Chrome (sidebars, title bars, tool rails) in both themes; text on the accent; page background on the websites */
+  --ui-white: #ffffff;
+  --ui-accent: #3b8cff; /* The one accent. Marks the next action, the current selection, focus and small signal dots. Text on it is ink */
+  --ui-accent-hover: #6aa6ff; /* Hover on accent fills, both themes. Hover lightens, never darkens */
+  --ui-accent-text-dark: #8ab8ff; /* Accent used as text, focus rings or link hover on dark surfaces */
+  --ui-accent-text-light: #1a5bc7; /* Accent used as text, focus rings or link hover on light surfaces */
+
+  --ui-bg: #151515; /* App canvas (board, image viewport) */
+  --ui-chrome: #090909;
+  --ui-surface-1: #1c1c1c; /* Panes, lists, inspectors, editor */
+  --ui-surface-2: #212121;
+  --ui-surface-3: #262626; /* Cards, active nav item, chips on panes */
+  --ui-surface-raised: #2b2b2b; /* Menus, popovers, toasts, card hover */
+  --ui-surface-hover: #303030;
+  --ui-input: #151515;
+  --ui-border: #3c3c3c;
+  --ui-border-soft: #2c2c2c;
+  --ui-text: #d9d9d9; /* Body text */
+  --ui-text-strong: #f2f2f2; /* Titles, selected items */
+  --ui-text-muted: #aaaaaa; /* Labels, secondary text */
+  --ui-text-faint: #8f8f8f; /* Meta, counts, placeholders. The faintest color allowed for readable text */
+  --ui-text-decorative: #5a5a5a; /* Large display numerals only. Never readable text */
+  --ui-accent-text: #8ab8ff;
+  --ui-on-accent: #090909;
+  --ui-avatar-bg: #3a3a3a;
+  --ui-avatar-text: #e6e6e6;
+  --ui-success: #6fb894;
+  --ui-warning: #e0a95b;
+  --ui-danger: #e0857d;
+  --ui-accent-soft: rgba(59, 140, 255, 0.14);
+  --ui-accent-border: rgba(59, 140, 255, 0.45);
+  --ui-selection: rgba(59, 140, 255, 0.3);
+  --ui-focus: 0 0 0 3px rgba(59, 140, 255, 0.2), 0 0 0 1px var(--ui-accent-text);
+  --ui-danger-soft: rgba(162, 61, 54, 0.2);
+  --ui-warning-soft: rgba(138, 85, 18, 0.24);
+  --ui-success-soft: rgba(38, 112, 83, 0.2);
+  --ui-overlay: rgba(9, 9, 9, 0.7);
+  --ui-shadow: 0 24px 80px rgba(0, 0, 0, 0.5); /* Dialogs and toasts only. Prefer borders and tint steps elsewhere */
+
+  --ui-font-ui: "proxima-nova", "Proxima Nova", -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif; /* Everything in the apps, and body text on the websites */
+  --ui-font-display: "din-condensed", "DIN Condensed", "Arial Narrow", sans-serif; /* Websites only, for big numerals. Never in app chrome */
+  --ui-font-mono: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace; /* Keyboard hints and code */
+  --ui-text-xs: 11px; /* Smallest allowed. Avatar initials, keyboard hints, tiny meta */
+  --ui-text-sm: 13px; /* Labels, meta, chips, section headers */
+  --ui-text-base: 14px; /* Body, inputs, buttons, rows */
+  --ui-text-lg: 16px; /* Panel and dialog titles */
+  --ui-text-xl: 24px; /* Page and board titles */
+  --ui-text-2xl: 28px; /* Empty-state and welcome titles */
+  --ui-weight-regular: 400;
+  --ui-weight-medium: 500;
+  --ui-weight-semibold: 600; /* The heaviest weight used. No 700 */
+  --ui-leading-ui: 1.45;
+  --ui-leading-tight: 1.12; /* Large headlines */
+
+  --ui-space-1: 2px;
+  --ui-space-2: 4px;
+  --ui-space-3: 6px;
+  --ui-space-4: 8px;
+  --ui-space-5: 12px;
+  --ui-space-6: 16px;
+  --ui-space-7: 24px;
+  --ui-radius-sm: 4px; /* Buttons, inputs, chips, menus */
+  --ui-radius-lg: 6px; /* Cards, panels, dialogs, toasts */
+  --ui-radius-pill: 999px; /* Avatars, signal dots and count badges only */
+  --ui-size-control: 36px; /* Default button and input height */
+  --ui-size-control-sm: 32px; /* Icon buttons, compact toolbars */
+  --ui-size-icon: 16px; /* Inline icon size in the apps (stroke icons, 2px stroke at 16px) */
+  --ui-size-dot: 6px; /* Signal dot */
+  --ui-size-avatar: 32px;
+  --ui-size-avatar-small: 24px;
+  --ui-duration-fast: 200ms; /* Color and border changes */
+  --ui-duration-panel: 300ms; /* Panels, dialogs, movement */
+}
+
+:root[data-theme="light"] {
+  --ui-bg: #f0f1f2;
+  --ui-chrome: #090909; /* Chrome stays ink in light theme so every app shares one frame */
+  --ui-surface-1: #ffffff;
+  --ui-surface-2: #f6f7f8;
+  --ui-surface-3: #e6e8eb;
+  --ui-surface-raised: #ffffff;
+  --ui-surface-hover: #e6e8eb;
+  --ui-input: #ffffff;
+  --ui-border: #c9ccd1;
+  --ui-border-soft: #dcdee1;
+  --ui-text: #36383b;
+  --ui-text-strong: #171717;
+  --ui-text-muted: #5f6267;
+  --ui-text-faint: #686b70;
+  --ui-text-decorative: #c9ccd1;
+  --ui-accent-text: #1a5bc7;
+  --ui-on-accent: #090909;
+  --ui-avatar-bg: #dcdee1;
+  --ui-avatar-text: #36383b;
+  --ui-success: #267053;
+  --ui-warning: #8a5512;
+  --ui-danger: #a23d36;
+  --ui-accent-soft: rgba(26, 91, 199, 0.1);
+  --ui-accent-border: rgba(26, 91, 199, 0.34);
+  --ui-selection: rgba(59, 140, 255, 0.22);
+  --ui-focus: 0 0 0 3px rgba(26, 91, 199, 0.16), 0 0 0 1px var(--ui-accent-text);
+  --ui-danger-soft: rgba(162, 61, 54, 0.09);
+  --ui-warning-soft: rgba(138, 85, 18, 0.1);
+  --ui-success-soft: rgba(38, 112, 83, 0.1);
+  --ui-overlay: rgba(23, 23, 23, 0.38);
+  --ui-shadow: 0 24px 80px rgba(23, 23, 23, 0.2);
+}
+
+:root[data-theme="graphite"] { /* Mid-dark neutral. Graphite sidebar, lifted text and status colors. */
+  --ui-bg: #38393d;
+  --ui-chrome: #2a2b2e;
+  --ui-chrome-active: #3a3c40;
+  --ui-surface-1: #414347;
+  --ui-surface-2: #46484c;
+  --ui-surface-3: #4c4e53;
+  --ui-surface-raised: #525459;
+  --ui-surface-hover: #5a5c61;
+  --ui-input: #333438;
+  --ui-border: #64676d;
+  --ui-border-soft: #575a5f;
+  --ui-text: #e2e3e6;
+  --ui-text-strong: #f7f7f8;
+  --ui-text-muted: #c8cacd;
+  --ui-text-faint: #babcc0;
+  --ui-text-decorative: #6e7177;
+  --ui-accent-text: #9cc3ff;
+  --ui-on-accent: #090909;
+  --ui-avatar-bg: #65686e;
+  --ui-avatar-text: #f2f3f4;
+  --ui-success: #8fd0b0;
+  --ui-warning: #ecc07e;
+  --ui-danger: #f0a39c;
+  --ui-danger-soft: rgba(240, 163, 156, 0.2);
+  --ui-warning-soft: rgba(236, 192, 126, 0.2);
+  --ui-success-soft: rgba(143, 208, 176, 0.2);
+}
+
+:root[data-theme="storm"] { /* Mid-dark cool. Slate sidebar and blue-grey surfaces. */
+  --ui-bg: #36404c;
+  --ui-chrome: #283039;
+  --ui-chrome-active: #38424e;
+  --ui-surface-1: #3f4a57;
+  --ui-surface-2: #44505e;
+  --ui-surface-3: #4a5664;
+  --ui-surface-raised: #505d6c;
+  --ui-surface-hover: #586575;
+  --ui-input: #313a45;
+  --ui-border: #626f7e;
+  --ui-border-soft: #55616f;
+  --ui-text: #dfe5ec;
+  --ui-text-strong: #f6f8fa;
+  --ui-text-muted: #c3ccd6;
+  --ui-text-faint: #b3bdc9;
+  --ui-text-decorative: #6b7887;
+  --ui-accent-text: #a3c8ff;
+  --ui-on-accent: #090909;
+  --ui-avatar-bg: #626f7e;
+  --ui-avatar-text: #eef2f6;
+  --ui-success: #8fd0b0;
+  --ui-warning: #ecc07e;
+  --ui-danger: #f0a39c;
+  --ui-danger-soft: rgba(240, 163, 156, 0.2);
+  --ui-warning-soft: rgba(236, 192, 126, 0.2);
+  --ui-success-soft: rgba(143, 208, 176, 0.2);
+}
+
+:root[data-theme="ash"] { /* Mid-light neutral. Dark text on grey, a darker grey sidebar, no white. */
+  --ui-bg: #b3b7bc;
+  --ui-chrome: #8e9298;
+  --ui-chrome-active: #a3a7ad;
+  --ui-surface-1: #c9ccd0;
+  --ui-surface-2: #bcc0c4;
+  --ui-surface-3: #a6aab0;
+  --ui-surface-raised: #d3d6d9;
+  --ui-surface-hover: #bfc3c7;
+  --ui-input: #d3d6d9;
+  --ui-border: #85898f;
+  --ui-border-soft: #999da3;
+  --ui-text: #1e2023;
+  --ui-text-strong: #0e0f11;
+  --ui-text-muted: #33363a;
+  --ui-text-faint: #3f4246;
+  --ui-text-decorative: #8e9298;
+  --ui-accent-text: #123f8c;
+  --ui-on-accent: #090909;
+  --ui-avatar-bg: #a3a7ad;
+  --ui-avatar-text: #1e2023;
+  --ui-success: #1a5039;
+  --ui-warning: #5f3a09;
+  --ui-danger: #7d2620;
+  --ui-danger-soft: rgba(125, 38, 32, 0.16);
+  --ui-warning-soft: rgba(95, 58, 9, 0.16);
+  --ui-success-soft: rgba(26, 80, 57, 0.16);
+}
+
+:root[data-theme="fog"] { /* Mid-light cool. Ash with a blue-grey cast, sidebar included. */
+  --ui-bg: #b2bcc8;
+  --ui-chrome: #8d99a7;
+  --ui-chrome-active: #a2adba;
+  --ui-surface-1: #c8d0d9;
+  --ui-surface-2: #bcc5cf;
+  --ui-surface-3: #a5b0bd;
+  --ui-surface-raised: #d2d9e0;
+  --ui-surface-hover: #b9c2cc;
+  --ui-input: #d2d9e0;
+  --ui-border: #838e9b;
+  --ui-border-soft: #97a2af;
+  --ui-text: #1b222b;
+  --ui-text-strong: #0b0f15;
+  --ui-text-muted: #303945;
+  --ui-text-faint: #3b4551;
+  --ui-text-decorative: #8d99a7;
+  --ui-accent-text: #123f8c;
+  --ui-on-accent: #090909;
+  --ui-avatar-bg: #a2adba;
+  --ui-avatar-text: #1b222b;
+  --ui-success: #1a5039;
+  --ui-warning: #5f3a09;
+  --ui-danger: #7d2620;
+  --ui-danger-soft: rgba(125, 38, 32, 0.16);
+  --ui-warning-soft: rgba(95, 58, 9, 0.16);
+  --ui-success-soft: rgba(26, 80, 57, 0.16);
+}
