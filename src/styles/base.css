@@ -1,0 +1,131 @@
+/* App-level aliases on top of the forme-brand tokens (tokens.css is a copy of
+   forme-brand tokens/ui.css; change it there first). */
+:root {
+  --chrome-bg: var(--ui-chrome);
+  --chrome-text: var(--ui-text);
+  --chrome-muted: var(--ui-text-muted);
+  --chrome-hover: var(--ui-surface-hover);
+  --chrome-border: var(--ui-border-soft);
+  color-scheme: dark;
+}
+
+/* Chrome stays ink in the light theme, so its text keeps the dark-theme greys. */
+:root[data-theme="light"] {
+  --chrome-text: #d9d9d9;
+  --chrome-muted: #aaaaaa;
+  --chrome-hover: #262626;
+  --chrome-border: #2c2c2c;
+  color-scheme: light;
+}
+
+:root[data-theme="ash"],
+:root[data-theme="fog"] {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  color: var(--ui-text);
+  background: var(--ui-bg);
+  font-family: var(--ui-font-ui);
+  font-size: var(--ui-text-base);
+  line-height: var(--ui-leading-ui);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus);
+}
+
+kbd {
+  font-family: var(--ui-font-mono);
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-faint);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  height: var(--ui-size-control-sm);
+  padding: 0 var(--ui-space-5);
+  color: var(--ui-text);
+  font-size: var(--ui-text-sm);
+  font-weight: var(--ui-weight-medium);
+  white-space: nowrap;
+  background: var(--ui-surface-3);
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+  transition: background var(--ui-duration-fast), color var(--ui-duration-fast);
+}
+
+.btn:hover {
+  color: var(--ui-text-strong);
+  background: var(--ui-surface-hover);
+}
+
+.btn.primary {
+  height: var(--ui-size-control);
+  padding: 0 var(--ui-space-6);
+  color: var(--ui-on-accent);
+  font-size: var(--ui-text-base);
+  font-weight: var(--ui-weight-semibold);
+  background: var(--ui-accent);
+}
+
+.btn.primary:hover {
+  color: var(--ui-on-accent);
+  background: var(--ui-accent-hover);
+}
+
+.btn.ghost {
+  background: transparent;
+}
+
+.btn.small {
+  height: 28px;
+  padding: 0 var(--ui-space-4);
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: var(--ui-size-control-sm);
+  height: var(--ui-size-control-sm);
+  color: var(--chrome-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  cursor: pointer;
+}
+
+.icon-btn:hover,
+.icon-btn[aria-pressed="true"] {
+  color: var(--chrome-text);
+  background: var(--chrome-hover);
+}

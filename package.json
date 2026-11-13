@@ -1,0 +1,32 @@
+{
+  "name": "locus",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev:vite": "vite --host 127.0.0.1 --port 1430",
+    "build:web": "tsc && vite build",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build --config src-tauri/tauri.local.conf.json",
+    "tauri:build:release": "tauri build",
+    "release:version": "node scripts/release-version.mjs"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.5.0",
+    "@tauri-apps/plugin-updater": "^2.10.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@tauri-apps/cli": "^2.5.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.7"
+  }
+}
