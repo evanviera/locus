@@ -91,6 +91,7 @@ export class Scene {
   private resized = new Set<ItemNode>();
   private resizeTimer = 0;
   private lastCloudLeft = -1;
+  private lastInput = 0;
 
   constructor(
     private host: HTMLElement,
@@ -145,12 +146,16 @@ export class Scene {
   private applySizes() {
     this.resizeTimer = 0;
     if (this.disposed || !this.board || !this.resized.size) return;
-    if (this.drag) {
-      this.resizeTimer = window.setTimeout(() => this.applySizes(), 400);
+    // Wait until the person stops dragging, zooming or panning: a box that
+    // reflows under the pointer reads as the board jumping around.
+    if (this.drag || performance.now() - this.lastInput < 1500) {
+      this.resizeTimer = window.setTimeout(() => this.applySizes(), 500);
       return;
     }
     const items = [...this.resized].filter((it) => this.board!.items.get(it.path) === it);
     this.resized.clear();
+    // Boxes keep their width; only the rows inside them reflow.
+    for (const g of this.board.groups.values()) if (!g.hasRec) g.keepW = g.w;
     layoutBoard(this.board);
     this.invalidate();
     const stored = items.filter((it) => it.group.mode === "free");
@@ -240,6 +245,7 @@ export class Scene {
   }
 
   zoomAt(sx: number, sy: number, factor: number) {
+    this.lastInput = performance.now();
     const before = this.toWorld(sx, sy);
     this.cam.zoom = Math.min(8, Math.max(0.005, this.cam.zoom * factor));
     this.cam.x = before.x - sx / this.cam.zoom;
@@ -451,11 +457,11 @@ export class Scene {
   private bindInput() {
     const host = this.host;
     const signal = this.listeners.signal;
-    host.addEventListener("wheel", (e) => this.onWheel(e), { passive: false, signal });
+    host.addEventListener("wheel", (e) => { this.lastInput = performance.now(); this.onWheel(e); }, { passive: false, signal });
     // Controls floating over the canvas (download status) handle their own clicks.
     const onControl = (e: Event) => !!(e.target as HTMLElement | null)?.closest?.("[data-canvas-control]");
     host.addEventListener("pointerdown", (e) => !onControl(e) && this.onDown(e), { signal });
-    host.addEventListener("pointermove", (e) => this.onMove(e), { signal });
+    host.addEventListener("pointermove", (e) => { if (this.drag) this.lastInput = performance.now(); this.onMove(e); }, { signal });
     host.addEventListener("pointerup", (e) => this.onUp(e), { signal });
     host.addEventListener("pointercancel", () => { this.drag = null; this.marquee.hidden = true; }, { signal });
     host.addEventListener("dblclick", (e) => this.onDouble(e), { signal });

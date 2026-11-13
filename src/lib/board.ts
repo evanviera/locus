@@ -61,6 +61,9 @@ export interface GroupNode {
   /** Images in this folder and every folder below it. */
   total: number;
   autoPlaced?: boolean;
+  /** Width an Auto box keeps for this session, so learning image shapes or a
+   *  rescan reflows rows inside it instead of reshaping the whole board. */
+  keepW?: number;
 }
 
 export interface Board {
@@ -74,7 +77,9 @@ export interface Board {
 
 const parentOf = (p: string) => (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "");
 
-export function buildBoard(scan: ScanResult, layout: MergedLayout, seen: Set<string> | null): Board {
+/** `prev` is the board being replaced (after a rescan): image shapes learned
+ *  from downloads and the widths of Auto boxes carry over, so nothing jumps. */
+export function buildBoard(scan: ScanResult, layout: MergedLayout, seen: Set<string> | null, prev?: Board): Board {
   const groups = new Map<string, GroupNode>();
   const ensure = (path: string, name: string): GroupNode => {
     let g = groups.get(path);
@@ -112,7 +117,9 @@ export function buildBoard(scan: ScanResult, layout: MergedLayout, seen: Set<str
   for (const img of scan.images) {
     const g = groups.get(img.folder) ?? groups.get(parentOf(img.path)) ?? root;
     const rec: ItemRec | undefined = layout.items[img.path];
-    const iw = img.width || rec?.iw || 1;
+    const before = prev?.items.get(img.path);
+    const learned = !img.width && before && before.aspect !== 1 ? before.aspect : 0;
+    const iw = img.width || rec?.iw || learned || 1;
     const ih = img.height || rec?.ih || 1;
     const placed = rec && rec.x !== undefined && rec.y !== undefined && !rec.moved;
     const item: ItemNode = {
@@ -128,6 +135,12 @@ export function buildBoard(scan: ScanResult, layout: MergedLayout, seen: Set<str
     };
     g.items.push(item);
     items.set(img.path, item);
+  }
+  if (prev) {
+    for (const g of groups.values()) {
+      const old = prev.groups.get(g.path);
+      if (old && !g.hasRec && old.w > 0) g.keepW = old.w;
+    }
   }
   const board: Board = { root, groups, items, drawGroups: [], drawItems: [] };
   setDepths(root, 0);
@@ -191,7 +204,7 @@ function itemHeight(it: ItemNode) {
 function sizeGroup(g: GroupNode) {
   for (const c of g.children) sizeGroup(c);
   if (g.mode === "auto") {
-    let cw = g.hasRec ? Math.max(ROW_H, g.w - PAD * 2) : naturalWidth(g);
+    let cw = g.hasRec ? Math.max(ROW_H, g.w - PAD * 2) : g.keepW ? g.keepW - PAD * 2 : naturalWidth(g);
     for (const c of g.children) cw = Math.max(cw, c.w);
     const rows = justify(g.items.map((it) => it.aspect), cw, ROW_H, GAP);
     g.items.forEach((it, i) => {

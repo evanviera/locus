@@ -206,7 +206,7 @@ export class Session {
     this.own = { ...payload.own, items: { ...payload.own.items, ...this.own.items }, groups: { ...payload.own.groups, ...this.own.groups } };
     const seen = new Set(this.board.items.keys());
     const prev = this.board;
-    this.board = buildBoard(payload.scan, payload.layout, seen);
+    this.board = buildBoard(payload.scan, payload.layout, seen, prev);
     // New-file dots that were showing stay until the board is reopened.
     for (const it of this.board.items.values()) if (prev.items.get(it.path)?.isNew) it.isNew = true;
     layoutBoard(this.board);

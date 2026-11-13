@@ -128,3 +128,23 @@ test("online-only images download by themselves and take their real shape", asyn
   expect(shapes.wrong).toBe(0);
   expect(shapes.square).toBeLessThan(120);
 });
+
+test("the board holds still while zooming during downloads", async ({ page }) => {
+  await page.goto(`/?n=600&cloud=0.8&stats`);
+  await page.waitForFunction(() => "__locus" in window);
+  await expect(page.getByTestId("cloud-status")).toBeVisible();
+  const where = () =>
+    page.evaluate(() => {
+      const { session } = (window as unknown as { __locus: { session: { board: { drawItems: { path: string; wx: number; wy: number }[] } } } }).__locus;
+      return session.board.drawItems.map((it) => `${it.path}:${Math.round(it.wx)},${Math.round(it.wy)}`).join("|");
+    });
+  const box = (await page.getByTestId("canvas").boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, -200);
+  const before = await where();
+  for (let i = 0; i < 12; i += 1) {
+    await page.mouse.wheel(0, i % 2 ? 120 : -120);
+    await page.waitForTimeout(150);
+  }
+  expect(await where()).toBe(before);
+});
