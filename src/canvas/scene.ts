@@ -4,6 +4,7 @@ import {
 } from "../lib/board.js";
 import type { Loader } from "./textures";
 import { TextureStore } from "./textures.js";
+import { drawFolder } from "./folders.js";
 import { type Camera, type RGBA, MODE_ATLAS, MODE_DOT, MODE_SINGLE, MODE_SOLID, Renderer, parseColor } from "./renderer.js";
 
 // The interactive canvas: camera, culling, level of detail, picking, dragging,
@@ -24,6 +25,8 @@ export interface SceneEvents {
   /** Images whose shape was learned from a download and that have stored records. */
   sizesLearned(items: ItemNode[]): void;
 }
+
+export type HierarchyStyle = import("../lib/prefs").FolderStyle;
 
 export interface Snapshot {
   items: Map<ItemNode, Pick<ItemNode, "x" | "y" | "w" | "rot" | "fx" | "fy" | "z">>;
@@ -78,8 +81,12 @@ export class Scene {
     placeholder: [0, 0, 0, 1] as RGBA,
     accent: [0, 0, 0, 1] as RGBA,
     accentSoft: [0, 0, 0, 1] as RGBA,
-    offline: [0, 0, 0, 1] as RGBA
+    offline: [0, 0, 0, 1] as RGBA,
+    border: [0, 0, 0, 1] as RGBA,
+    raised: [0, 0, 0, 1] as RGBA
   };
+  /** How folder nesting is drawn (see `drawGroup`). */
+  hierarchy: HierarchyStyle = "frames";
   private labels = new Map<GroupNode, HTMLDivElement>();
   private selBox: HTMLDivElement;
   private marquee: HTMLDivElement;
@@ -175,7 +182,9 @@ export class Scene {
       placeholder: parseColor(css("--ui-surface-hover")),
       accent: parseColor(css("--ui-accent")),
       accentSoft: parseColor(css("--ui-accent"), 0.16),
-      offline: parseColor(css("--ui-border"))
+      offline: parseColor(css("--ui-border")),
+      border: parseColor(css("--ui-border")),
+      raised: parseColor(css("--ui-surface-raised"))
     };
     this.invalidate();
   }
@@ -312,14 +321,13 @@ export class Scene {
     const vy1 = cam.y + r.height / cam.zoom;
     const px = 1 / cam.zoom; // one css pixel in world units
 
-    // Folder boxes (parents first). Tint steps by depth, no outlines.
+    // Folder boxes (parents first).
     for (const g of board.drawGroups) {
       if (g.wx > vx1 || g.wy > vy1 || g.wx + g.w < vx0 || g.wy + g.h < vy0) continue;
       if (g.w * cam.zoom < 2) continue;
-      const color = this.colors.boxes[Math.min(g.depth, 2)];
-      const radius = Math.min(6 * px, g.w / 2, g.h / 2);
-      r.push(g.wx + g.w / 2, g.wy + g.h / 2, g.w / 2, g.h / 2, 0, false, false, null, 0, MODE_SOLID, color, radius);
+      drawFolder(this.renderer, this.colors, this.hierarchy, g, px);
       if (g === this.dropTarget) {
+        const radius = Math.min(6 * px, g.w / 2, g.h / 2);
         r.push(g.wx + g.w / 2, g.wy + g.h / 2, g.w / 2, g.h / 2, 0, false, false, null, 0, MODE_SOLID, this.colors.accentSoft, radius);
       }
     }
@@ -401,7 +409,7 @@ export class Scene {
     // Folder names. When headers are too small to hold them, names float as
     // small tags; a tag is skipped if it would cover one already placed.
     const roomy = HEADER * zoom >= 18;
-    const placed: { x: number; y: number; w: number }[] = [];
+    const placed: { x: number; y: number; w: number; g: GroupNode; trail: GroupNode[] }[] = [];
     for (const g of board.drawGroups) {
       if (g.wx > vx1 || g.wy > vy1 || g.wx + g.w < vx0 || g.wy + g.h < vy0) continue;
       const sw = g.w * zoom;
@@ -409,8 +417,21 @@ export class Scene {
       const sx = Math.max(4, (g.wx + PAD - this.cam.x) * zoom);
       const sy = Math.max(4, (g.wy - this.cam.y) * zoom + (roomy ? (HEADER * zoom - 20) / 2 : 4));
       const tagW = Math.min(sw - 8, 8 + (g.name.length + 4) * 7.5);
-      if (!roomy && placed.some((r) => Math.abs(r.y - sy) < 24 && sx < r.x + r.w && r.x < sx + tagW)) continue;
-      placed.push({ x: sx, y: sy, w: tagW });
+      if (!roomy) {
+        const hit = placed.find((r) => Math.abs(r.y - sy) < 24 && sx < r.x + r.w && r.x < sx + tagW);
+        if (hit) {
+          // A folder whose box starts where its parent's does (the parent has
+          // no loose images) joins the parent's tag as a path: "Characters / Heroes".
+          const chainEnd = hit.trail[hit.trail.length - 1] ?? hit.g;
+          const atParentOrigin = g.parent === chainEnd && chainEnd.items.length === 0 && g.x === 0 && g.y === 0;
+          if (atParentOrigin && hit.trail.length < 4) {
+            hit.trail.push(g);
+            hit.w += (g.name.length + 3) * 7.5;
+          }
+          continue;
+        }
+      }
+      placed.push({ x: sx, y: sy, w: tagW, g, trail: [] });
       seen.add(g);
       let label = this.labels.get(g);
       if (!label) {
@@ -420,12 +441,19 @@ export class Scene {
         this.overlay.appendChild(label);
         this.labels.set(g, label);
       }
-      (label.firstChild as HTMLElement).textContent = g.name;
-      (label.lastChild as HTMLElement).textContent = g.total.toLocaleString();
+      label.dataset.depth = String(Math.min(g.depth, 3));
+      label.dataset.style = this.hierarchy;
       label.style.transform = `translate(${sx}px, ${sy}px)`;
       label.style.maxWidth = `${Math.max(0, sw - 8)}px`;
       label.classList.toggle("tag", !roomy);
       label.hidden = false;
+    }
+    for (const p of placed) {
+      const label = this.labels.get(p.g)!;
+      const text = [p.g, ...p.trail].map((g) => g.name).join("  /  ");
+      const last = p.trail[p.trail.length - 1] ?? p.g;
+      (label.firstChild as HTMLElement).textContent = text;
+      (label.lastChild as HTMLElement).textContent = last.total.toLocaleString();
     }
     for (const [g, label] of this.labels) if (!seen.has(g)) label.hidden = true;
 

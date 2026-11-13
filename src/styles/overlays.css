@@ -113,3 +113,61 @@
 .update-bar {
   top: 60px;
 }
+
+/* Confirmation dialog: every move or copy on disk asks first. */
+.dialog-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: var(--ui-overlay);
+}
+
+.dialog {
+  display: grid;
+  gap: var(--ui-space-5);
+  width: min(420px, calc(100vw - 32px));
+  padding: var(--ui-space-7);
+  background: var(--ui-surface-raised);
+  border: 1px solid var(--ui-border-soft);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: var(--ui-shadow);
+}
+
+.dialog h2 {
+  margin: 0;
+  color: var(--ui-text);
+  font-size: var(--ui-text-lg);
+  font-weight: var(--ui-weight-semibold);
+}
+
+.dialog p {
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-base);
+  line-height: 1.45;
+}
+
+.dialog-input {
+  height: var(--ui-size-control);
+  padding: 0 var(--ui-space-4);
+  color: var(--ui-text);
+  font: inherit;
+  font-size: var(--ui-text-base);
+  background: var(--ui-surface-1);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+}
+
+.dialog-input:focus {
+  outline: none;
+  border-color: var(--ui-accent);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ui-space-4);
+  margin-top: var(--ui-space-3);
+}

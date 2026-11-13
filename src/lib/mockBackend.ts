@@ -7,8 +7,8 @@ import type { BoardPayload, Folder, ImageEntry, LayoutDoc, MergedLayout, Tier } 
 // until they are "downloaded", which takes longer, like Google Drive.
 
 const SECTIONS: Record<string, string[]> = {
-  Characters: ["Hero", "Sidekick", "Villain", "Crowd"],
-  Environments: ["Forest", "Harbor town", "Interior"],
+  Characters: ["Heroes/Boy", "Heroes/Girl", "Sidekick", "Villain", "Crowd"],
+  Environments: ["Forest", "Harbor town/Docks", "Harbor town/Market", "Interior"],
   Props: [],
   "Color keys": ["Act 1", "Act 2"],
   Storyboards: ["Seq 010", "Seq 020", "Seq 030"],
@@ -31,9 +31,14 @@ function buildTree(n: number, seed: number) {
     folders.push({ path: section, name: section, parent: "" });
     if (subs.length === 0) leaves.push(section);
     for (const sub of subs) {
-      const path = `${section}/${sub}`;
-      folders.push({ path, name: sub, parent: section });
-      leaves.push(path);
+      // "Heroes/Boy" adds "Heroes" once, then "Boy" inside it.
+      let parent = section;
+      for (const part of sub.split("/")) {
+        const path = `${parent}/${part}`;
+        if (!folders.some((f) => f.path === path)) folders.push({ path, name: part, parent });
+        parent = path;
+      }
+      leaves.push(parent);
     }
   }
   leaves.push("");

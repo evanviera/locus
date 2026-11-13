@@ -1,5 +1,5 @@
 import { type RefObject } from "react";
-import { THEMES, THEME_NAMES, type Theme } from "../lib/prefs.js";
+import { FOLDER_STYLES, FOLDER_STYLE_NAMES, THEMES, THEME_NAMES, type FolderStyle, type Theme } from "../lib/prefs.js";
 
 interface Props {
   name: string;
@@ -11,11 +11,13 @@ interface Props {
   matches: number | null;
   searchRef: RefObject<HTMLInputElement | null>;
   theme: Theme;
+  folderStyle: FolderStyle;
   sidebar: boolean;
   onQuery(q: string): void;
   onSearchKey(e: React.KeyboardEvent<HTMLInputElement>): void;
   onFit(): void;
   onTheme(t: Theme): void;
+  onFolderStyle(s: FolderStyle): void;
   onToggleSidebar(): void;
   onClose(): void;
 }
@@ -52,6 +54,19 @@ export function Toolbar(p: Props) {
       <button className="btn" onClick={p.onFit} title="Fit board (⌘0)">
         Fit
       </button>
+      <select
+        className="select"
+        value={p.folderStyle}
+        onChange={(e) => p.onFolderStyle(e.target.value as FolderStyle)}
+        aria-label="Folder style"
+        title="How folders are drawn"
+      >
+        {FOLDER_STYLES.map((s) => (
+          <option key={s} value={s}>
+            {FOLDER_STYLE_NAMES[s]}
+          </option>
+        ))}
+      </select>
       <select className="select" value={p.theme} onChange={(e) => p.onTheme(e.target.value as Theme)} aria-label="Theme">
         {THEMES.map((t) => (
           <option key={t} value={t}>

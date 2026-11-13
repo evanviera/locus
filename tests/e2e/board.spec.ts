@@ -73,16 +73,31 @@ test("dragging an image inside its box makes the box Free and saves the spot", a
   expect(state).toEqual({ mode: "free", saved: true, groupSaved: "free" });
 });
 
-test("dropping an image on another folder moves the file, and Undo moves it back", async ({ page }) => {
+test("dropping an image on another folder asks first, moves the file, and Undo moves it back", async ({ page }) => {
   await open(page);
   const path = "Mood/mood_002.jpg";
+  const has = (p: string) => page.evaluate((x) => (window as unknown as { __locus: Hook }).__locus.session.board.items.has(x), p);
   const from = await centerOf(page, path);
   const to = await groupCenter(page, "Props");
+
+  // Cancel leaves the file where it was.
   await drag(page, from, to);
+  const dialog = page.getByTestId("confirm");
+  await expect(dialog).toContainText("Move “mood_002.jpg” to “Props”?");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+  expect(await has(path)).toBe(true);
+
+  await drag(page, from, to);
+  await dialog.getByRole("button", { name: "Move", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Moved mood_002.jpg to Props");
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __locus: Hook }).__locus.session.board.items.has("Props/mood_002.jpg"))).toBe(true);
+  await expect.poll(() => has("Props/mood_002.jpg")).toBe(true);
+
+  // Undo moves the file on disk too, so it asks again.
   await page.keyboard.press("Control+z");
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __locus: Hook }).__locus.session.board.items.has("Mood/mood_002.jpg"))).toBe(true);
+  await expect(dialog).toContainText("back?");
+  await page.keyboard.press("Enter");
+  await expect.poll(() => has(path)).toBe(true);
 });
 
 test("a board of 3,000 images opens and stays interactive", async ({ page }) => {
